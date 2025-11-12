@@ -76,9 +76,8 @@ def log(message):
     print(f"{datetime.now():%Y-%m-%d %H:%M:%S} - {message}", flush=True)
 
 def default_config_path():
-    # Default to Homebrew etc unless overridden
-    prefix = os.environ.get("HOMEBREW_PREFIX") or "/opt/homebrew"
-    return f"{prefix}/etc/kube-backup/config.yaml"
+    # Use dedicated config environment variable or fallback to user config
+    return os.environ.get("KUBE_BACKUP_CONFIG") or "~/.config/kube-backup/config.yaml"
 
 def main():
     parser = argparse.ArgumentParser(description="Kube Backup Script")
@@ -208,7 +207,7 @@ class KubeBackup < Formula
       # Wrapper sets env and delegates to the real script (with UV shebang)
       (bin/"kube-backup").write_env_script libexec/"bin/kube-backup.py",
         KUBE_BACKUP_HOME: opt_pkgshare,
-        HOMEBREW_PREFIX: HOMEBREW_PREFIX.to_s, # for default config discovery
+        KUBE_BACKUP_CONFIG: etc/"kube-backup/config.yaml", # direct config path
         PYTHONUNBUFFERED: "1"
 
       # Install shared data for the script
@@ -251,7 +250,7 @@ end
 
 **Notes**
 - We depend only on `uv`. The script’s shebang `#!/usr/bin/env -S uv run --script` ensures the right interpreter and ephemeral environment per script header.
-- The wrapper sets `KUBE_BACKUP_HOME` → `opt_pkgshare` and provides `HOMEBREW_PREFIX` so the script can default its config path cleanly.
+- The wrapper sets `KUBE_BACKUP_HOME` → `opt_pkgshare` for support files and `KUBE_BACKUP_CONFIG` → `etc/kube-backup/config.yaml` for the configuration path.
 - Data lives in `pkgshare`, configs in `etc`, logs in `var/log`, and we use the modern `service do` DSL.
 
 ---
@@ -336,7 +335,7 @@ brew services start kube-backup
 ## Extras & Gotchas
 - **PATH in launchd**: We set `PATH: std_service_path_env` so `uv` is found reliably under Homebrew.
 - **No venvs**: UV handles Python interpreter and dependencies on demand via the script header.
-- **Defaults**: `--config` is optional and defaults to `$(brew --prefix)/etc/kube-backup/config.yaml`, which works for both services and manual runs.
-- **Apple Silicon vs Intel**: Homebrew prefix is `/opt/homebrew` on Apple Silicon and `/usr/local` on Intel; the formula passes `HOMEBREW_PREFIX` to the script so defaults are correct.
+- **Defaults**: `--config` is optional and defaults to the path set by `KUBE_BACKUP_CONFIG` environment variable, or `~/.config/kube-backup/config.yaml` for manual runs.
+- **Platform Independence**: The formula sets `KUBE_BACKUP_CONFIG` directly, so the script doesn't need to know about Homebrew prefixes or platform differences.
 - **Security**: Config files contain API keys and secrets. The `--edit` command automatically sets secure permissions (`chmod 600`). Never commit config files to version control.
 - **Log rotation**: `brew services` does not rotate logs; consider `newsyslog`, internal rotation, or periodic pruning.

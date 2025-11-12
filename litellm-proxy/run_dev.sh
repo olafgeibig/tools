@@ -1,0 +1,1 @@
+./bin/litellm-proxy.py --config ./dev/config.yaml

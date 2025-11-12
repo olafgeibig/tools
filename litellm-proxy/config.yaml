@@ -1,9 +1,0 @@
-env:
-  API_KEY: foo
-
-litellm-proxy:
-  config: ./example.yaml
-  port: 4000
-
-tracer:
-  enabled: false

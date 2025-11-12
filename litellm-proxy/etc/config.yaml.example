@@ -1,0 +1,31 @@
+# LiteLLM Proxy Configuration
+# Copy to config.yaml and customize
+# Keep this file secure (chmod 600) as it contains API keys
+
+# Environment variables for the proxy
+env:
+  # API keys and secrets - replace with your actual values
+  API_KEY: your-api-key-here
+  # Add other environment variables as needed
+  # ANOTHER_KEY: another-value-here
+
+# LiteLLM proxy server settings
+litellm-proxy:
+  # Path to LiteLLM model configuration (relative to this config file)
+  config: litellm.yaml
+  
+  # Server binding configuration
+  host: 0.0.0.0
+  port: 4000
+
+# OpenTelemetry tracing configuration (optional)
+tracer:
+  enabled: false
+  
+  # Tracer settings (only used when enabled: true)
+  # project_name: "litellm-proxy"
+  # endpoint: "https://your-phoenix-instance.com/v1/traces"
+  
+  # Additional tracer options
+  # batch: true
+  # auto_instrument: true
