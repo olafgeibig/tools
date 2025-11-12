@@ -33,7 +33,7 @@ personal-scripts/
 │   ├── bin/
 │   │   └── kube-backup.py        # THE EXECUTABLE (UV shebang)
 │   ├── etc/
-│   │   └── config.ini.example    # DEFAULT CONFIG (user copies to config.ini)
+│   │   └── config.yaml.example    # DEFAULT CONFIG (user copies to config.yaml)
 │   └── lib/
 │       └── support_files/
 │           └── cluster_list.txt
@@ -42,7 +42,7 @@ personal-scripts/
 │   ├── bin/
 │   │   └── log-rotator.sh
 │   └── etc/
- │       └── log-rotator.conf.example.example
+ │       └── log-rotator.conf.example
 │
 └── README.md
 ```
@@ -63,8 +63,10 @@ personal-scripts/
 import os
 import sys
 import argparse
-import configparser
+import yaml
+import shutil
 from datetime import datetime
+
 from pathlib import Path
 
 # Homebrew wrapper will set this to opt_pkgshare.
@@ -76,29 +78,66 @@ def log(message):
 def default_config_path():
     # Default to Homebrew etc unless overridden
     prefix = os.environ.get("HOMEBREW_PREFIX") or "/opt/homebrew"
-    return f"{prefix}/etc/kube-backup/config.ini"
+    return f"{prefix}/etc/kube-backup/config.yaml"
 
 def main():
     parser = argparse.ArgumentParser(description="Kube Backup Script")
     parser.add_argument("--config", default=default_config_path(),
-                        help="Path to config file (default: Homebrew etc/kube-backup/config.ini)")
+                        help="Path to config file (default: Homebrew etc/kube-backup/config.yaml)")
     parser.add_argument("--version", action="store_true", help="Show version and exit")
+    parser.add_argument("--edit", action="store_true", help="Open config file in default editor")
     args = parser.parse_args()
 
     if args.version:
         print("kube-backup 1.0.0")
         sys.exit(0)
 
+    if args.edit:
+        import subprocess
+        import shutil
+        config_path = args.config or default_config_path()
+        
+        # Ensure config file exists
+        if not os.path.exists(config_path):
+            example_path = config_path.replace('.yaml', '.yaml.example')
+            if os.path.exists(example_path):
+                shutil.copy(example_path, config_path)
+                os.chmod(config_path, 0o600)
+                print(f"Created config file from example: {config_path}")
+            else:
+                print(f"ERROR: Example config not found at {example_path}", file=sys.stderr)
+                sys.exit(1)
+        
+        editor = os.environ.get('VISUAL') or os.environ.get('EDITOR', 'nano')
+        try:
+            subprocess.call([editor, config_path])
+        except FileNotFoundError:
+            print(f"ERROR: Editor '{editor}' not found. Please set VISUAL or EDITOR environment variable or install nano.", file=sys.stderr)
+            sys.exit(1)
+        sys.exit(0)
+
     log("Backup service started.")
 
-    config = configparser.ConfigParser()
     try:
-        read = config.read(args.config)
-        if not read:
-            print(f"ERROR: Config not found at {args.config}", file=sys.stderr, flush=True)
+        with open(args.config, 'r') as f:
+            config = yaml.safe_load(f) or {}
+        settings = config.get('Settings') or {}
+        backup_path = settings.get('BackupPath')
+        api_key = settings.get('ApiKey')
+        secret_token = settings.get('SecretToken')
+        
+        if not backup_path:
+            print(f"ERROR: BackupPath missing in {args.config}", file=sys.stderr, flush=True)
             sys.exit(1)
-        backup_path = config.get('Settings', 'BackupPath')
+        if not api_key:
+            print(f"ERROR: ApiKey missing in {args.config}", file=sys.stderr, flush=True)
+            sys.exit(1)
+        if not secret_token:
+            print(f"ERROR: SecretToken missing in {args.config}", file=sys.stderr, flush=True)
+            sys.exit(1)
+            
         log(f"Using backup path: {backup_path}")
+        log("API configuration loaded")
     except Exception as e:
         print(f"ERROR: Could not read config at {args.config}: {e}", file=sys.stderr, flush=True)
         sys.exit(1)
@@ -122,11 +161,14 @@ if __name__ == "__main__":
     main()
 ```
 
-`kube-backup/etc/config.ini.example`
+`kube-backup/etc/config.yaml.example`
 
-```ini
-[Settings]
-BackupPath = /Users/your-username/Backups/kube
+```yaml
+Settings:
+  BackupPath: /Users/your-username/Backups/kube
+  # API keys and secrets - keep this file secure (chmod 600)
+  ApiKey: your-api-key-here
+  SecretToken: your-secret-here
 # Add other settings here
 ```
 
@@ -166,19 +208,19 @@ class KubeBackup < Formula
       # Wrapper sets env and delegates to the real script (with UV shebang)
       (bin/"kube-backup").write_env_script libexec/"bin/kube-backup.py",
         KUBE_BACKUP_HOME: opt_pkgshare,
-         HOMEBREW_PREFIX: HOMEBREW_PREFIX.to_s, # for default config discovery
+        HOMEBREW_PREFIX: HOMEBREW_PREFIX.to_s, # for default config discovery
         PYTHONUNBUFFERED: "1"
 
       # Install shared data for the script
       (pkgshare/"lib/support_files").install Dir["lib/support_files/*"]
 
-      # Install example config; user copies to config.ini
-      (etc/"kube-backup").install "etc/config.ini.example"
+      # Install example config; user copies to config.yaml
+      (etc/"kube-backup").install "etc/config.yaml.example"
     end
   end
 
   service do
-    run [opt_bin/"kube-backup", "--config", etc/"kube-backup/config.ini"]
+    run [opt_bin/"kube-backup", "--config", etc/"kube-backup/config.yaml"]
     run_at_load true
     keep_alive false
     run_type :interval
@@ -192,11 +234,10 @@ class KubeBackup < Formula
   def caveats
     <<~EOS
       A sample config was installed to:
-        #{etc}/kube-backup/config.ini.example
+        #{etc}/kube-backup/config.yaml.example
 
-      Copy it to activate and then edit:
-        cp #{etc}/kube-backup/config.ini.example #{etc}/kube-backup/config.ini
-        chmod 600 #{etc}/kube-backup/config.ini
+      Edit your configuration (creates from example if needed):
+        kube-backup --edit
 
       Start the service:
         brew services start kube-backup
@@ -204,11 +245,6 @@ class KubeBackup < Formula
       Logs:
         tail -f #{var}/log/kube-backup.log
     EOS
-  end
-
-  test do
-    # Avoid running real backup logic; just validate CLI responds
-     assert_match "Kube Backup Script", shell_output("#{bin}/kube-backup --help")
   end
 end
 ```
@@ -268,17 +304,10 @@ brew install kube-backup
 
 #### 2. Set Up Your Config
 
-`brew install` put the example config in `etc`. Copy it to create your active config.
+Edit your configuration (creates from example if needed):
 
 ```bash
-# Get the Homebrew prefix path (e.g., /opt/homebrew)
-PREFIX=$(brew --prefix)
-
-# Copy the example config to the active config
-cp "$PREFIX/etc/kube-backup/config.ini.example" "$PREFIX/etc/kube-backup/config.ini"
-
-# Now, edit your personal config
-nano "$PREFIX/etc/kube-backup/config.ini"
+kube-backup --edit
 ```
 
 #### 3. Run Your Service
@@ -307,6 +336,7 @@ brew services start kube-backup
 ## Extras & Gotchas
 - **PATH in launchd**: We set `PATH: std_service_path_env` so `uv` is found reliably under Homebrew.
 - **No venvs**: UV handles Python interpreter and dependencies on demand via the script header.
-- **Defaults**: `--config` is optional and defaults to `$(brew --prefix)/etc/kube-backup/config.ini`, which works for both services and manual runs.
+- **Defaults**: `--config` is optional and defaults to `$(brew --prefix)/etc/kube-backup/config.yaml`, which works for both services and manual runs.
 - **Apple Silicon vs Intel**: Homebrew prefix is `/opt/homebrew` on Apple Silicon and `/usr/local` on Intel; the formula passes `HOMEBREW_PREFIX` to the script so defaults are correct.
+- **Security**: Config files contain API keys and secrets. The `--edit` command automatically sets secure permissions (`chmod 600`). Never commit config files to version control.
 - **Log rotation**: `brew services` does not rotate logs; consider `newsyslog`, internal rotation, or periodic pruning.

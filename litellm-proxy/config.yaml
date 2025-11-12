@@ -1,4 +1,5 @@
-env: ./example.env
+env:
+  API_KEY: foo
 
 litellm-proxy:
   config: ./example.yaml
