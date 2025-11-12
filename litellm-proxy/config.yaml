@@ -1,0 +1,8 @@
+env: ./example.env
+
+litellm-proxy:
+  config: ./example.yaml
+  port: 4000
+
+tracer:
+  enabled: false

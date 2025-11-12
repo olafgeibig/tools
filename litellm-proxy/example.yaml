@@ -1,0 +1,15 @@
+litellm_settings:
+  drop_params: true
+  cache: True
+  cache_params:
+    type: local
+model_list:
+  - model_name: gpt-5
+    litellm_params:
+      model: azure/gpt-5
+      api_base: https://xplatform-openai-shared3.openai.azure.com
+      api_version: 2025-04-01-preview
+      api_key: "os.environ/XPLATFORM3_API_KEY"
+      additional_drop_params: ["max_tokens", "temperature", "reasoningEffort", "textVerbosity"]
+    model_info:
+      base_model: azure/gpt-5
