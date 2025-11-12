@@ -51,8 +51,12 @@ def setup_environment(config):
     """Set up environment variables from config"""
     env_config = config.get("env", {})
     for key, value in env_config.items():
-        if value and not os.environ.get(key):
+        if value:
+            # Set direct value from config (e.g., "API_KEY: your-api-key-here")
             os.environ[key] = str(value)
+            log(
+                f"Set {key} from config: {str(value)[:20]}{'...' if len(str(value)) > 20 else ''}"
+            )
 
 
 def setup_tracer(tracer_config):
