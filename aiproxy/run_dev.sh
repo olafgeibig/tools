@@ -1,1 +1,1 @@
-./bin/aiproxy.py --config ./dev/config.yaml
+./bin/aiproxy.py --config ./dev/config.yaml $*

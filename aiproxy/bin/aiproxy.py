@@ -92,6 +92,102 @@ def setup_tracer(tracer_config):
         return None
 
 
+def list_profiles(config):
+    """List all available profiles with descriptions"""
+    profiles = config.get("profiles", {})
+    default_profile = config.get("default_profile")
+
+    if not profiles:
+        print("No profiles found in configuration", file=sys.stderr)
+        return False
+
+    print("Available profiles:")
+    for name, profile_config in profiles.items():
+        description = profile_config.get("description", "No description available")
+        default_marker = " (default)" if name == default_profile else ""
+        print(f"  {name}{default_marker}")
+        print(f"    {description}")
+        print(f"    litellm-config: {profile_config.get('litellm-config', 'N/A')}")
+        print(f"    host: {profile_config.get('host', 'N/A')}")
+        print(f"    port: {profile_config.get('port', 'N/A')}")
+        print()
+
+    return True
+
+
+def get_default_profile(config):
+    """Get the current default profile name"""
+    default_profile = config.get("default_profile")
+    if default_profile:
+        print(f"Default profile: {default_profile}")
+    else:
+        print("No default profile set", file=sys.stderr)
+    return default_profile
+
+
+def set_default_profile(config_path, profile_name):
+    """Set the default profile in the config file"""
+    import yaml
+
+    try:
+        with open(config_path, "r") as f:
+            config = yaml.safe_load(f) or {}
+
+        profiles = config.get("profiles", {})
+        if profile_name not in profiles:
+            print(f"ERROR: Profile '{profile_name}' not found", file=sys.stderr)
+            print("Available profiles:", file=sys.stderr)
+            for name in profiles.keys():
+                print(f"  {name}", file=sys.stderr)
+            return False
+
+        config["default_profile"] = profile_name
+
+        with open(config_path, "w") as f:
+            yaml.dump(config, f, default_flow_style=False)
+
+        print(f"Default profile set to: {profile_name}")
+        return True
+    except Exception as e:
+        print(f"ERROR: Could not update config: {e}", file=sys.stderr)
+        return False
+
+
+def get_profile_config(config, profile_name):
+    """Get configuration for a specific profile"""
+    profiles = config.get("profiles", {})
+
+    if profile_name not in profiles:
+        print(f"ERROR: Profile '{profile_name}' not found", file=sys.stderr)
+        print("Use --list-profiles to see available profiles", file=sys.stderr)
+        return None
+
+    profile_config = profiles[profile_name]
+
+    # Validate required fields
+    required_fields = ["litellm-config", "host", "port"]
+    for field in required_fields:
+        if field not in profile_config:
+            print(
+                f"ERROR: Profile '{profile_name}' missing required field: {field}",
+                file=sys.stderr,
+            )
+            return None
+
+    return profile_config
+
+
+def check_legacy_config(config):
+    """Check for legacy aiproxy section and suggest migration"""
+    if "aiproxy" in config:
+        print("WARNING: Legacy 'aiproxy' configuration section found.", file=sys.stderr)
+        print("Please migrate to the new profile-based format:", file=sys.stderr)
+        print("  https://github.com/your-repo/docs/migration", file=sys.stderr)
+        print("", file=sys.stderr)
+        return True
+    return False
+
+
 def main():
     parser = argparse.ArgumentParser(description="AI Proxy Server")
     parser.add_argument(
@@ -105,8 +201,24 @@ def main():
         action="store_true",
         help="Output absolute path to config directory",
     )
-    parser.add_argument("--host", help="Override host from config")
-    parser.add_argument("--port", type=int, help="Override port from config")
+    parser.add_argument("--profile", help="Profile to use (overrides default profile)")
+    parser.add_argument(
+        "--list-profiles",
+        action="store_true",
+        help="List all available profiles",
+    )
+    parser.add_argument(
+        "--get-default",
+        action="store_true",
+        help="Show current default profile",
+    )
+    parser.add_argument(
+        "--set-default",
+        metavar="PROFILE",
+        help="Set default profile",
+    )
+    parser.add_argument("--host", help="Override host from profile")
+    parser.add_argument("--port", type=int, help="Override port from profile")
     args = parser.parse_args()
 
     if args.version:
@@ -122,14 +234,44 @@ def main():
     # Load configuration
     config = load_config(args.config)
 
+    # Handle profile management commands
+    if args.list_profiles:
+        list_profiles(config)
+        sys.exit(0)
+
+    if args.get_default:
+        get_default_profile(config)
+        sys.exit(0)
+
+    if args.set_default:
+        if set_default_profile(args.config, args.set_default):
+            sys.exit(0)
+        else:
+            sys.exit(1)
+
+    # Check for legacy configuration
+    check_legacy_config(config)
+
+    # Determine which profile to use
+    profile_name = args.profile or config.get("default_profile")
+    if not profile_name:
+        print("ERROR: No profile specified and no default profile set", file=sys.stderr)
+        print("Use --profile <name> or set default_profile in config", file=sys.stderr)
+        print("Use --list-profiles to see available profiles", file=sys.stderr)
+        sys.exit(1)
+
+    # Get profile configuration
+    profile_config = get_profile_config(config, profile_name)
+    if not profile_config:
+        sys.exit(1)
+
     # Set up environment
     setup_environment(config)
 
-    # Get proxy configuration
-    proxy_config = config.get("aiproxy", {})
-    litellm_config_filename = proxy_config.get("config", "litellm.yaml")
-    host = args.host or proxy_config.get("host", "0.0.0.0")
-    port = args.port or proxy_config.get("port", 4000)
+    # Extract profile settings
+    litellm_config_filename = profile_config["litellm-config"]
+    host = args.host or profile_config["host"]
+    port = args.port or profile_config["port"]
 
     # Resolve litellm config path
     config_dir = Path(args.config).parent
@@ -156,6 +298,7 @@ def main():
     )
 
     log(f"Starting AI proxy on {host}:{port}")
+    log(f"Using profile: {profile_name}")
     log(f"Using config: {args.config}")
     log(f"Using LiteLLM config: {litellm_config_path}")
 

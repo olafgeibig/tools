@@ -1,0 +1,14 @@
+default_profile: example
+
+env:
+  EXAMPLE_API_KEY: your-api-key-here
+
+profiles:
+  example:
+    description: Example profile
+    host: 0.0.0.0
+    litellm-config: example.yaml
+    port: 4000
+
+tracer:
+  enabled: false

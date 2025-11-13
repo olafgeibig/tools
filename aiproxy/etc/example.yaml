@@ -1,0 +1,13 @@
+litellm_settings:
+  cache: True
+  cache_params:
+    type: local
+model_list:
+  - model_name: gpt-5-mini
+    litellm_params:
+      model: azure/gpt5_series/gpt-5-mini
+      api_base: https://myazure.openai.azure.com
+      api_version: 2025-04-01-preview
+      api_key: os.environ/EXAMPLE_API_KEY
+    model_info:
+      base_model: azure/gpt-5-mini
