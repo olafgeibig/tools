@@ -1,4 +1,4 @@
-# LiteLLM Proxy Configuration
+# AI Proxy Configuration
 # Copy to config.yaml and customize
 # Keep this file secure (chmod 600) as it contains API keys
 
@@ -9,8 +9,8 @@ env:
   # Add other environment variables as needed
   # ANOTHER_KEY: another-value-here
 
-# LiteLLM proxy server settings
-litellm-proxy:
+# AI proxy server settings
+aiproxy:
   # Path to LiteLLM model configuration (relative to this config file)
   config: litellm.yaml
   
@@ -23,7 +23,7 @@ tracer:
   enabled: false
   
   # Tracer settings (only used when enabled: true)
-  # project_name: "litellm-proxy"
+  # project_name: "aiproxy"
   # endpoint: "https://your-phoenix-instance.com/v1/traces"
   
   # Additional tracer options

@@ -18,13 +18,11 @@ from pathlib import Path
 
 def default_config_path():
     """Use dedicated config environment variable or fallback to user config"""
-    return (
-        os.environ.get("LITELLM_PROXY_CONFIG") or "~/.config/litellm-proxy/config.yaml"
-    )
+    return os.environ.get("AIPROXY_CONFIG") or "~/.config/aiproxy/config.yaml"
 
 
 def log(message):
-    print(f"[litellm-proxy] {message}", flush=True)
+    print(f"[aiproxy] {message}", flush=True)
 
 
 def load_config(config_path):
@@ -34,7 +32,7 @@ def load_config(config_path):
     if not os.path.exists(config_path):
         print(f"ERROR: Configuration file not found: {config_path}", file=sys.stderr)
         print(
-            f"Create it from example or run: litellm-proxy --config-dir",
+            f"Create it from example or run: aiproxy --config-dir",
             file=sys.stderr,
         )
         sys.exit(1)
@@ -68,7 +66,7 @@ def setup_tracer(tracer_config):
     try:
         from phoenix.otel import register
 
-        project_name = tracer_config.get("project_name", "litellm-proxy")
+        project_name = tracer_config.get("project_name", "aiproxy")
         endpoint = tracer_config.get("endpoint")
 
         if not endpoint:
@@ -95,11 +93,11 @@ def setup_tracer(tracer_config):
 
 
 def main():
-    parser = argparse.ArgumentParser(description="LiteLLM Proxy Server")
+    parser = argparse.ArgumentParser(description="AI Proxy Server")
     parser.add_argument(
         "--config",
         default=default_config_path(),
-        help="Path to config file (default: LITELLM_PROXY_CONFIG or ~/.config/litellm-proxy/config.yaml)",
+        help="Path to config file (default: AIPROXY_CONFIG or ~/.config/aiproxy/config.yaml)",
     )
     parser.add_argument("--version", action="store_true", help="Show version and exit")
     parser.add_argument(
@@ -112,7 +110,7 @@ def main():
     args = parser.parse_args()
 
     if args.version:
-        print("litellm-proxy 1.0.0")
+        print("aiproxy 1.0.0")
         sys.exit(0)
 
     if args.config_dir:
@@ -128,7 +126,7 @@ def main():
     setup_environment(config)
 
     # Get proxy configuration
-    proxy_config = config.get("litellm-proxy", {})
+    proxy_config = config.get("aiproxy", {})
     litellm_config_filename = proxy_config.get("config", "litellm.yaml")
     host = args.host or proxy_config.get("host", "0.0.0.0")
     port = args.port or proxy_config.get("port", 4000)
@@ -157,7 +155,7 @@ def main():
         config=str(litellm_config_path),
     )
 
-    log(f"Starting LiteLLM proxy on {host}:{port}")
+    log(f"Starting AI proxy on {host}:{port}")
     log(f"Using config: {args.config}")
     log(f"Using LiteLLM config: {litellm_config_path}")
 

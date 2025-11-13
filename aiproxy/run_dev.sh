@@ -1,0 +1,1 @@
+./bin/aiproxy.py --config ./dev/config.yaml
