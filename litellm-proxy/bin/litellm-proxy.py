@@ -34,7 +34,8 @@ def load_config(config_path):
     if not os.path.exists(config_path):
         print(f"ERROR: Configuration file not found: {config_path}", file=sys.stderr)
         print(
-            f"Create it from the example or run: litellm-proxy --edit", file=sys.stderr
+            f"Create it from example or run: litellm-proxy --config-dir",
+            file=sys.stderr,
         )
         sys.exit(1)
 
@@ -102,7 +103,9 @@ def main():
     )
     parser.add_argument("--version", action="store_true", help="Show version and exit")
     parser.add_argument(
-        "--edit", action="store_true", help="Open config file in default editor"
+        "--config-dir",
+        action="store_true",
+        help="Output absolute path to config directory",
     )
     parser.add_argument("--host", help="Override host from config")
     parser.add_argument("--port", type=int, help="Override port from config")
@@ -112,35 +115,10 @@ def main():
         print("litellm-proxy 1.0.0")
         sys.exit(0)
 
-    if args.edit:
-        import subprocess
-        import shutil
-
+    if args.config_dir:
         config_path = args.config or default_config_path()
-
-        # Ensure config file exists
-        if not os.path.exists(config_path):
-            example_path = config_path.replace(".yaml", ".yaml.example")
-            if os.path.exists(example_path):
-                shutil.copy(example_path, config_path)
-                os.chmod(config_path, 0o600)
-                print(f"Created config file from example: {config_path}")
-            else:
-                print(
-                    f"ERROR: Example config not found at {example_path}",
-                    file=sys.stderr,
-                )
-                sys.exit(1)
-
-        editor = os.environ.get("VISUAL") or os.environ.get("EDITOR", "nano")
-        try:
-            subprocess.call([editor, config_path])
-        except FileNotFoundError:
-            print(
-                f"ERROR: Editor '{editor}' not found. Please set VISUAL or EDITOR environment variable or install nano.",
-                file=sys.stderr,
-            )
-            sys.exit(1)
+        config_dir = Path(config_path).parent.expanduser().resolve()
+        print(config_dir)
         sys.exit(0)
 
     # Load configuration
