@@ -1,7 +1,7 @@
 class Aiproxy < Formula
   desc "AI Proxy Server (UV-powered Python script)"
   homepage "https://github.com/olafgeibig/tools"
-  url "https://github.com/olafgeibig/tools/archive/refs/tags/0.1.0.tar.gz"
+  url "https://github.com/olafgeibig/tools/archive/refs/tags/0.1.1.tar.gz"
   sha256 "96c781b409ca1a95a88f4a26a1fd52ff515593e9383806ff01fca2f671fc458d"
   license ""
 
