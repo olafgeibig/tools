@@ -30,146 +30,69 @@ This is your main project. All your scripts live here, cleanly separated.
 personal-scripts/
 │
 ├── kube-backup/                  # Script 1
-│   ├── bin/
-│   │   └── kube-backup.py        # THE EXECUTABLE (UV shebang)
-│   ├── etc/
-│   │   └── config.yaml.example    # DEFAULT CONFIG (user copies to config.yaml)
-│   └── lib/
-│       └── support_files/
-│           └── cluster_list.txt
+│   ├── kube-backup.py            # Main script (UV shebang)
+│   ├── config.yaml               # Default config (packaged with script)
+│   └── support_files/            # Support files directory
+│       └── cluster_list.txt
 │
 ├── log-rotator/                  # Script 2
-│   ├── bin/
-│   │   └── log-rotator.sh
-│   └── etc/
- │       └── log-rotator.conf.example
+│   ├── log-rotator.sh
+│   └── log-rotator.conf
 │
 └── README.md
 ```
 
-### Example File Contents
+### Script Implementation Requirements
 
-`kube-backup/bin/kube-backup.py` — UV-native script with config defaulting to Homebrew etc and support files via env.
+Your script must implement the following pattern to work with the Homebrew wrapper:
 
-```python
-#!/usr/bin/env -S uv run --script
-# /// script
-# requires-python = ">=3.12"
-# dependencies = [
-#     "pyyaml",
-# ]
-# ///
+**Environment Variables (injected by Homebrew wrapper):**
+- `SCRIPT_HOME` - Path to support files directory (e.g., `/usr/local/share/kube-backup`)
+- `SCRIPT_CONFIG` - Path to the packaged config file (e.g., `/usr/local/etc/kube-backup/config.yaml`)
 
-import os
-import sys
-import argparse
-import yaml
-import shutil
-from datetime import datetime
+**Required Script Features:**
 
-from pathlib import Path
+1. **Config Path Resolution:**
+   ```python
+   def default_config_path():
+       """Use SCRIPT_CONFIG from Homebrew or fallback to user config"""
+       return os.environ.get("SCRIPT_CONFIG") or "~/.config/kube-backup/config.yaml"
+   ```
 
-# Homebrew wrapper will set this to opt_pkgshare.
-SUPPORT_DIR_PATH = os.environ.get("KUBE_BACKUP_HOME")
+2. **Config Directory Command:**
+   ```python
+   parser.add_argument("--config-dir", action="store_true", 
+                      help="Output absolute path to config directory")
+   
+   if args.config_dir:
+       config_path = args.config or default_config_path()
+       config_dir = Path(config_path).parent.expanduser().resolve()
+       print(config_dir)
+       sys.exit(0)
+   ```
 
-def log(message):
-    print(f"{datetime.now():%Y-%m-%d %H:%M:%S} - {message}", flush=True)
+3. **Support Files Access:**
+   ```python
+   support_dir = os.environ.get("SCRIPT_HOME")
+   if not support_dir:
+       print("ERROR: SCRIPT_HOME not set (expected via brew wrapper).", file=sys.stderr)
+       sys.exit(1)
+   
+   support_file = Path(support_dir) / "support_files" / "cluster_list.txt"
+   ```
 
-def default_config_path():
-    # Use dedicated config environment variable or fallback to user config
-    return os.environ.get("KUBE_BACKUP_CONFIG") or "~/.config/kube-backup/config.yaml"
+4. **Config Loading with Clear Error Messages:**
+   ```python
+   def load_config(config_path):
+       if not os.path.exists(config_path):
+           print(f"ERROR: Configuration file not found: {config_path}", file=sys.stderr)
+           print(f"Run: kube-backup --config-dir to find config location", file=sys.stderr)
+           sys.exit(1)
+       # ... load and validate config
+   ```
 
-def main():
-    parser = argparse.ArgumentParser(description="Kube Backup Script")
-    parser.add_argument("--config", default=default_config_path(),
-                        help="Path to config file (default: Homebrew etc/kube-backup/config.yaml)")
-    parser.add_argument("--version", action="store_true", help="Show version and exit")
-    parser.add_argument("--edit", action="store_true", help="Open config file in default editor")
-    args = parser.parse_args()
-
-    if args.version:
-        print("kube-backup 1.0.0")
-        sys.exit(0)
-
-    if args.edit:
-        import subprocess
-        import shutil
-        config_path = args.config or default_config_path()
-        
-        # Ensure config file exists
-        if not os.path.exists(config_path):
-            example_path = config_path.replace('.yaml', '.yaml.example')
-            if os.path.exists(example_path):
-                shutil.copy(example_path, config_path)
-                os.chmod(config_path, 0o600)
-                print(f"Created config file from example: {config_path}")
-            else:
-                print(f"ERROR: Example config not found at {example_path}", file=sys.stderr)
-                sys.exit(1)
-        
-        editor = os.environ.get('VISUAL') or os.environ.get('EDITOR', 'nano')
-        try:
-            subprocess.call([editor, config_path])
-        except FileNotFoundError:
-            print(f"ERROR: Editor '{editor}' not found. Please set VISUAL or EDITOR environment variable or install nano.", file=sys.stderr)
-            sys.exit(1)
-        sys.exit(0)
-
-    log("Backup service started.")
-
-    try:
-        with open(args.config, 'r') as f:
-            config = yaml.safe_load(f) or {}
-        settings = config.get('Settings') or {}
-        backup_path = settings.get('BackupPath')
-        api_key = settings.get('ApiKey')
-        secret_token = settings.get('SecretToken')
-        
-        if not backup_path:
-            print(f"ERROR: BackupPath missing in {args.config}", file=sys.stderr, flush=True)
-            sys.exit(1)
-        if not api_key:
-            print(f"ERROR: ApiKey missing in {args.config}", file=sys.stderr, flush=True)
-            sys.exit(1)
-        if not secret_token:
-            print(f"ERROR: SecretToken missing in {args.config}", file=sys.stderr, flush=True)
-            sys.exit(1)
-            
-        log(f"Using backup path: {backup_path}")
-        log("API configuration loaded")
-    except Exception as e:
-        print(f"ERROR: Could not read config at {args.config}: {e}", file=sys.stderr, flush=True)
-        sys.exit(1)
-
-    if not SUPPORT_DIR_PATH:
-        print("ERROR: KUBE_BACKUP_HOME not set (expected via brew wrapper).", file=sys.stderr, flush=True)
-        sys.exit(1)
-
-    support_file = Path(SUPPORT_DIR_PATH) / "lib" / "support_files" / "cluster_list.txt"
-    try:
-        clusters = support_file.read_text().splitlines()
-        log(f"Found support file. Processing {len(clusters)} clusters...")
-    except Exception as e:
-        log(f"ERROR: Could not read support file at {support_file}: {e}")
-        sys.exit(1)
-
-    # ... (backup logic would go here) ...
-    log("Backup complete.")
-
-if __name__ == "__main__":
-    main()
-```
-
-`kube-backup/etc/config.yaml.example`
-
-```yaml
-Settings:
-  BackupPath: /Users/your-username/Backups/kube
-  # API keys and secrets - keep this file secure (chmod 600)
-  ApiKey: your-api-key-here
-  SecretToken: your-secret-here
-# Add other settings here
-```
+**Packaged Config File:**
+Include a default `config.yaml` in your script directory that gets installed by Homebrew. Users can edit this file directly after installation.
 
 ---
 
@@ -201,20 +124,20 @@ class KubeBackup < Formula
   def install
     cd "kube-backup" do
       # Install the real script and make sure it's executable
-      libexec.install "bin"
-      chmod 0755, libexec/"bin/kube-backup.py"
+      libexec.install "kube-backup.py"
+      chmod 0755, libexec/"kube-backup.py"
 
       # Wrapper sets env and delegates to the real script (with UV shebang)
-      (bin/"kube-backup").write_env_script libexec/"bin/kube-backup.py",
-        KUBE_BACKUP_HOME: opt_pkgshare,
-        KUBE_BACKUP_CONFIG: etc/"kube-backup/config.yaml", # direct config path
+      (bin/"kube-backup").write_env_script libexec/"kube-backup.py",
+        SCRIPT_HOME: pkgshare,
+        SCRIPT_CONFIG: etc/"kube-backup/config.yaml",
         PYTHONUNBUFFERED: "1"
 
-      # Install shared data for the script
-      (pkgshare/"lib/support_files").install Dir["lib/support_files/*"]
+      # Install support files for the script
+      pkgshare.install Dir["support_files/*"]
 
-      # Install example config; user copies to config.yaml
-      (etc/"kube-backup").install "etc/config.yaml.example"
+      # Install default config file (user edits this directly)
+      (etc/"kube-backup").install "config.yaml"
     end
   end
 
@@ -232,11 +155,11 @@ class KubeBackup < Formula
 
   def caveats
     <<~EOS
-      A sample config was installed to:
-        #{etc}/kube-backup/config.yaml.example
+      Configuration file installed to:
+        #{etc}/kube-backup/config.yaml
 
-      Edit your configuration (creates from example if needed):
-        kube-backup --edit
+      Find config directory:
+        kube-backup --config-dir
 
       Start the service:
         brew services start kube-backup
@@ -249,9 +172,10 @@ end
 ```
 
 **Notes**
-- We depend only on `uv`. The script’s shebang `#!/usr/bin/env -S uv run --script` ensures the right interpreter and ephemeral environment per script header.
-- The wrapper sets `KUBE_BACKUP_HOME` → `opt_pkgshare` for support files and `KUBE_BACKUP_CONFIG` → `etc/kube-backup/config.yaml` for the configuration path.
+- We depend only on `uv`. The script's shebang `#!/usr/bin/env -S uv run --script` ensures the right interpreter and ephemeral environment per script header.
+- The wrapper sets `SCRIPT_HOME` → `pkgshare` for support files and `SCRIPT_CONFIG` → `etc/script-name/config.yaml` for the configuration path.
 - Data lives in `pkgshare`, configs in `etc`, logs in `var/log`, and we use the modern `service do` DSL.
+- No `.example` files needed - the default config is packaged and edited directly by users.
 
 ---
 
@@ -303,10 +227,11 @@ brew install kube-backup
 
 #### 2. Set Up Your Config
 
-Edit your configuration (creates from example if needed):
+Find the config directory and edit the packaged configuration:
 
 ```bash
-kube-backup --edit
+kube-backup --config-dir
+# Edit the config.yaml file in that directory
 ```
 
 #### 3. Run Your Service
@@ -335,7 +260,7 @@ brew services start kube-backup
 ## Extras & Gotchas
 - **PATH in launchd**: We set `PATH: std_service_path_env` so `uv` is found reliably under Homebrew.
 - **No venvs**: UV handles Python interpreter and dependencies on demand via the script header.
-- **Defaults**: `--config` is optional and defaults to the path set by `KUBE_BACKUP_CONFIG` environment variable, or `~/.config/kube-backup/config.yaml` for manual runs.
-- **Platform Independence**: The formula sets `KUBE_BACKUP_CONFIG` directly, so the script doesn't need to know about Homebrew prefixes or platform differences.
-- **Security**: Config files contain API keys and secrets. The `--edit` command automatically sets secure permissions (`chmod 600`). Never commit config files to version control.
+- **Defaults**: `--config` is optional and defaults to the path set by `SCRIPT_CONFIG` environment variable, or `~/.config/script-name/config.yaml` for manual runs.
+- **Platform Independence**: The formula sets `SCRIPT_CONFIG` directly, so the script doesn't need to know about Homebrew prefixes or platform differences.
+- **Security**: Config files contain API keys and secrets. Set secure permissions (`chmod 600`) on config files. Never commit secrets to version control.
 - **Log rotation**: `brew services` does not rotate logs; consider `newsyslog`, internal rotation, or periodic pruning.

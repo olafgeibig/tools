@@ -17,8 +17,12 @@ from pathlib import Path
 
 
 def default_config_path():
-    """Use dedicated config environment variable or fallback to user config"""
-    return os.environ.get("AIPROXY_CONFIG") or "~/.config/aiproxy/config.yaml"
+    """Use SCRIPT_CONFIG env var from Homebrew or fallback to user config"""
+    return (
+        os.environ.get("SCRIPT_CONFIG")
+        or os.environ.get("AIPROXY_CONFIG")
+        or "~/.config/aiproxy/config.yaml"
+    )
 
 
 def log(message):
@@ -274,7 +278,7 @@ def main():
     port = args.port or profile_config["port"]
 
     # Resolve litellm config path
-    config_dir = Path(args.config).parent
+    config_dir = Path(args.config).parent.expanduser().resolve()
     litellm_config_path = config_dir / litellm_config_filename
 
     if not litellm_config_path.exists():
@@ -282,6 +286,8 @@ def main():
             f"ERROR: LiteLLM config file not found: {litellm_config_path}",
             file=sys.stderr,
         )
+        print(f"Config directory: {config_dir}", file=sys.stderr)
+        print(f"Expected file: {litellm_config_filename}", file=sys.stderr)
         sys.exit(1)
 
     # Set up tracer if enabled
