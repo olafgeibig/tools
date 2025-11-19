@@ -4,11 +4,50 @@ from pathlib import Path
 from platformdirs import user_config_dir
 import yaml
 from .utils import log
+import shutil
+from importlib.resources import files
+
 
 def default_config_path():
     """Use user config dir for configuration"""
     config_dir = Path(user_config_dir("aiproxy"))
     return str(config_dir / "config.yaml")
+
+
+def ensure_config_exists():
+    """Ensure configuration files exist in the user config directory"""
+    config_dir = Path(user_config_dir("aiproxy"))
+    config_path = config_dir / "config.yaml"
+
+    if not config_path.exists():
+        print(f"First run detected. Initializing configuration at {config_dir}...")
+        config_dir.mkdir(parents=True, exist_ok=True)
+
+        try:
+            # Access package data using importlib.resources.files
+            package_files = files("aiproxy")
+            etc_dir = package_files / "etc"
+
+            # Copy config.yaml
+            config_file = etc_dir / "config.yaml"
+            if config_file.is_file():
+                config_path.write_text(config_file.read_text())
+                print(f"Created {config_path}")
+            else:
+                print(
+                    "WARNING: Default config.yaml not found in package.",
+                    file=sys.stderr,
+                )
+
+            # Copy example.yaml if it exists
+            example_file = etc_dir / "example.yaml"
+            if example_file.is_file():
+                (config_dir / "example.yaml").write_text(example_file.read_text())
+                print(f"Created {config_dir / 'example.yaml'}")
+
+        except Exception as e:
+            print(f"ERROR: Failed to initialize configuration: {e}", file=sys.stderr)
+            # We don't exit here, we let load_config fail if it must, or return empty
 
 
 def load_config(config_path):
@@ -123,14 +162,3 @@ def get_profile_config(config, profile_name):
             return None
 
     return profile_config
-
-
-def check_legacy_config(config):
-    """Check for legacy aiproxy section and suggest migration"""
-    if "aiproxy" in config:
-        print("WARNING: Legacy 'aiproxy' configuration section found.", file=sys.stderr)
-        print("Please migrate to the new profile-based format:", file=sys.stderr)
-        print("  https://github.com/your-repo/docs/migration", file=sys.stderr)
-        print("", file=sys.stderr)
-        return True
-    return False

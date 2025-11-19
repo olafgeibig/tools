@@ -14,7 +14,7 @@ dependencies = [
 ]
 
 [project.scripts]
-aiproxy = "aiproxy.cli:main"
+aiproxy = "aiproxy.main:main"
 
 [build-system]
 requires = ["hatchling"]
