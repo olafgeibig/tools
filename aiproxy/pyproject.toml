@@ -4,6 +4,9 @@ version = "0.2.0"
 description = "AI Proxy Server"
 readme = "README.md"
 requires-python = ">=3.12"
+license = { text = "MIT" }
+authors = [{ name = "Olaf Geibig", email = "olaf@pobox.com" }]
+
 dependencies = [
     "litellm[proxy]",
     "arize-phoenix-otel",
@@ -12,6 +15,9 @@ dependencies = [
     "pyyaml",
     "platformdirs",
 ]
+
+[project.urls]
+Repository = "https://github.com/olafgeibig/tools/blob/main/aiproxy/"
 
 [project.scripts]
 aiproxy = "aiproxy.main:main"
