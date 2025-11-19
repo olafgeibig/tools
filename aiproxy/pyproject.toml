@@ -1,0 +1,21 @@
+[project]
+name = "aiproxy"
+version = "0.2.0"
+description = "AI Proxy Server"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "litellm[proxy]",
+    "arize-phoenix-otel",
+    "openinference-instrumentation-litellm",
+    "uvicorn",
+    "pyyaml",
+    "platformdirs",
+]
+
+[project.scripts]
+aiproxy = "aiproxy.cli:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"

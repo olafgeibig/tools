@@ -12,9 +12,23 @@ A profile-based proxy server for AI model APIs built on LiteLLM. This tool allow
 
 ## Installation
 
-TODO brew install and service
+You can install `aiproxy` using `uv`:
 
-aiproxy.py --help shows the options
+```bash
+uv tool install .
+```
+
+To install from a specific branch or tag:
+
+```bash
+uv tool install git+https://github.com/olafgeibig/tools.git@tag
+```
+
+Verify the installation:
+
+```bash
+aiproxy --version
+```
 
 ## Environment Variables
 
