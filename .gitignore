@@ -1,4 +1,5 @@
 .ruff_cache
 .vscode
 .venv
+__pychache__
 dev/
