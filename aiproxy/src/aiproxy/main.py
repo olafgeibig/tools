@@ -14,15 +14,17 @@ from .config import (
     get_profile_config,
     get_profile_config,
     setup_environment,
-    ensure_config_exists,
+)
+from .install import (
+    ensure_installation,
+    install_service,
+    uninstall_service,
+    restart_service,
 )
 from .utils import log, setup_tracer
 
 
 def main():
-    # Ensure configuration exists on first run
-    ensure_config_exists()
-
     parser = argparse.ArgumentParser(description="AI Proxy Server")
     parser.add_argument(
         "--config",
@@ -53,7 +55,37 @@ def main():
     )
     parser.add_argument("--host", help="Override host from profile")
     parser.add_argument("--port", type=int, help="Override port from profile")
+    parser.add_argument(
+        "--install-service",
+        action="store_true",
+        help="Install aiproxy as a per-user LaunchAgent",
+    )
+    parser.add_argument(
+        "--uninstall-service",
+        action="store_true",
+        help="Uninstall the per-user aiproxy LaunchAgent",
+    )
+    parser.add_argument(
+        "--restart-service",
+        action="store_true",
+        help="Restart the per-user aiproxy LaunchAgent",
+    )
     args = parser.parse_args()
+
+    if args.install_service:
+        install_service()
+        sys.exit(0)
+
+    if args.uninstall_service:
+        uninstall_service()
+        sys.exit(0)
+
+    if args.restart_service:
+        restart_service()
+        sys.exit(0)
+
+    # Ensure configuration exists on first run
+    ensure_installation()
 
     if args.version:
         print("aiproxy 0.2.0")

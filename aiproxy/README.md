@@ -46,3 +46,36 @@ You can set environment variables to pass to the proxy server in the `env` secti
 - Keep your `config.yaml` file secure (chmod 600) as it contains API keys
 - Use environment variables for sensitive data when possible
 - Consider using a secrets management system for production deployments
+
+## Service (LaunchAgent)
+
+`aiproxy` can be installed as a per‑user LaunchAgent on macOS (no root required). The service runs under your user account and starts when you log in.
+
+- Install service
+  - `aiproxy --install-service`
+  - This writes `~/Library/LaunchAgents/com.github.olafgeibig.tools.aiproxy.plist` and runs:
+    - `launchctl bootstrap gui/$(id -u) ~/Library/LaunchAgents/com.github.olafgeibig.tools.aiproxy.plist`
+    - `launchctl enable gui/$(id -u)/com.github.olafgeibig.tools.aiproxy`
+    - `launchctl kickstart -k gui/$(id -u)/com.github.olafgeibig.tools.aiproxy`
+
+- Restart service
+  - `aiproxy --restart-service`
+
+- Uninstall service
+  - `aiproxy --uninstall-service`
+
+- Check status
+  - `launchctl print gui/$(id -u)/com.github.olafgeibig.tools.aiproxy`
+
+- Logs
+  - Application logs: platformdirs user log dir for "aiproxy" (on macOS: `~/Library/Logs/aiproxy/aiproxy.log`)
+  - LaunchAgent stdout/stderr:
+    - `~/Library/Logs/aiproxy/aiproxy.launchd.out.log`
+    - `~/Library/Logs/aiproxy/aiproxy.launchd.err.log`
+
+Notes
+- LaunchAgent runs only while you are logged in. If you need the service before login or system‑wide, consider a LaunchDaemon (root install) instead.
+- Default host/port and LiteLLM worker config are chosen via your selected profile; override with `--host`/`--port` when running in the foreground.
+
+## Development
+Run the aiproxy with `uv run aiproxy --help`
